@@ -2003,7 +2003,7 @@ namespace WebSocketSharp
 
         _authChallenge = AuthenticationChallenge.Parse (chal);
         if (_authChallenge == null) {
-          _logger.Error ("An invalid authentication challenge is specified.");
+          _logger.Error ("An invalid authentication challenge is specified: " + chal);
           return res;
         }
 
@@ -2087,7 +2087,7 @@ namespace WebSocketSharp
 
         var authChal = AuthenticationChallenge.Parse (chal);
         if (authChal == null)
-          throw new WebSocketException ("An invalid proxy authentication challenge is specified.");
+          throw new WebSocketException ("An invalid proxy authentication challenge is specified: " + chal);
 
         if (_proxyCredentials != null) {
           if (res.HasConnectionClose) {

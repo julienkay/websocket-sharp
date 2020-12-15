@@ -93,13 +93,13 @@ namespace WebSocketSharp.Net
         return null;
 
       var schm = chal[0].ToLower ();
-      return schm == "basic"
-             ? new AuthenticationChallenge (
-                 AuthenticationSchemes.Basic, ParseParameters (chal[1]))
-             : schm == "digest"
-               ? new AuthenticationChallenge (
-                   AuthenticationSchemes.Digest, ParseParameters (chal[1]))
-               : null;
+      return schm.Contains("basic")
+            ? new AuthenticationChallenge(
+                 AuthenticationSchemes.Basic, ParseParameters(chal[1]))
+            : schm.Contains("digest")
+                ? new AuthenticationChallenge(
+                    AuthenticationSchemes.Digest, ParseParameters(chal[1]))
+                : null;
     }
 
     internal override string ToBasicString ()
