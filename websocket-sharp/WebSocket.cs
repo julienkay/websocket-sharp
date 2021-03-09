@@ -981,6 +981,23 @@ namespace WebSocketSharp
       return true;
     }
 
+    private static string NVCToString(NameValueCollection nvc) {
+      if (nvc == null) return string.Empty;
+      
+      StringBuilder s = new StringBuilder();
+      
+      foreach (string key in nvc.Keys) {
+        string[] values = nvc.GetValues(key);
+        if (values == null) continue;
+        
+        foreach(string value in values) {
+            s.AppendFormat("{0} : {1} \n", key, value);
+        }
+      }
+
+      return s.ToString();
+    }
+
     // As client
     private bool checkHandshakeResponse (HttpResponse response, out string message)
     {
@@ -997,7 +1014,11 @@ namespace WebSocketSharp
       }
 
       if (!response.IsWebSocketResponse) {
-        message = "Not a WebSocket handshake response.";
+        message = "Not a WebSocket handshake response." + '\n' +
+                    "Protocol Version: " + response.ProtocolVersion + '\n' +
+                    "Status Code: " + response.StatusCode + '\n' +
+                    "Headers: " + '\n' + NVCToString(response.Headers)
+                    ;
         return false;
       }
 
