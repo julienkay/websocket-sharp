@@ -23,3 +23,8 @@ This is not intended to be a websocket library with long term support. This is o
 ## Roadmap ##
 
 - [ ] Support Negotiate Authentication (Kerberos/NTLM)
+
+## Branches ##
+
+- [main-proxy-modifications](https://github.com/julienkay/websocket-sharp) is the default branch and contains all changes that were made in this fork
+- [master](https://github.com/julienkay/websocket-sharp/tree/master) is an up-to-date copy of the master branch in the upstream websocket-sharp repository and can be used to bring in upstream changes as necessary
