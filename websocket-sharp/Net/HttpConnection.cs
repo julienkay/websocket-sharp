@@ -67,7 +67,6 @@ namespace WebSocketSharp.Net
     private StringBuilder         _currentLine;
     private InputState            _inputState;
     private RequestStream         _inputStream;
-    private HttpListener          _lastListener;
     private LineState             _lineState;
     private EndPointListener      _listener;
     private EndPoint              _localEndPoint;
@@ -201,7 +200,7 @@ namespace WebSocketSharp.Net
       }
 
       unregisterContext ();
-      removeConnection ();
+      _listener.RemoveConnection (this);
     }
 
     private void closeSocket ()
@@ -307,11 +306,11 @@ namespace WebSocketSharp.Net
         var len = (int) conn._requestBuffer.Length;
 
         if (conn.processInput (conn._requestBuffer.GetBuffer (), len)) {
-          if (!conn._context.HasError)
+          if (!conn._context.HasErrorMessage)
             conn._context.Request.FinishInitialization ();
 
-          if (conn._context.HasError) {
-            conn.SendError ();
+          if (conn._context.HasErrorMessage) {
+            conn._context.SendError ();
 
             return;
           }
@@ -325,7 +324,8 @@ namespace WebSocketSharp.Net
             return;
           }
 
-          conn.SendError (null, 404);
+          conn._context.ErrorStatusCode = 404;
+          conn._context.SendError ();
 
           return;
         }
@@ -356,7 +356,8 @@ namespace WebSocketSharp.Net
         if (conn._timeoutCanceled[current])
           return;
 
-        conn.SendError (null, 408);
+        conn._context.ErrorStatusCode = 408;
+        conn._context.SendError ();
       }
     }
 
@@ -394,7 +395,7 @@ namespace WebSocketSharp.Net
             _context.Request.AddHeader (line);
           }
 
-          if (_context.HasError)
+          if (_context.HasErrorMessage)
             return true;
         }
       }
@@ -452,38 +453,19 @@ namespace WebSocketSharp.Net
 
     private void registerContext (HttpListener listener)
     {
-      if (_lastListener != listener) {
-        removeConnection ();
-
-        if (!listener.AddConnection (this)) {
-          close ();
-
-          return;
-        }
-
-        _lastListener = listener;
-      }
-
       _context.Listener = listener;
 
       if (!_context.Authenticate ())
         return;
 
-      if (!_context.Register ())
-        return;
-
-      _contextRegistered = true;
-    }
-
-    private void removeConnection ()
-    {
-      if (_lastListener == null) {
-        _listener.RemoveConnection (this);
+      if (!_context.Register ()) {
+        _context.ErrorStatusCode = 503;
+        _context.SendError ();
 
         return;
       }
 
-      _lastListener.RemoveConnection (this);
+      _contextRegistered = true;
     }
 
     private void unregisterContext ()
@@ -607,48 +589,6 @@ namespace WebSocketSharp.Net
         _outputStream = new ResponseStream (_stream, _context.Response, ignore);
 
         return _outputStream;
-      }
-    }
-
-    public void SendError ()
-    {
-      SendError (_context.ErrorMessage, _context.ErrorStatus);
-    }
-
-    public void SendError (string message, int status)
-    {
-      if (_socket == null)
-        return;
-
-      lock (_sync) {
-        if (_socket == null)
-          return;
-
-        try {
-          var res = _context.Response;
-          res.StatusCode = status;
-          res.ContentType = "text/html";
-
-          var content = new StringBuilder (64);
-          content.AppendFormat (
-            "<html><body><h1>{0} {1}", status, res.StatusDescription
-          );
-
-          if (message != null && message.Length > 0)
-            content.AppendFormat (" ({0})</h1></body></html>", message);
-          else
-            content.Append ("</h1></body></html>");
-
-          var enc = Encoding.UTF8;
-          var entity = enc.GetBytes (content.ToString ());
-          res.ContentEncoding = enc;
-          res.ContentLength64 = entity.LongLength;
-
-          res.Close (entity, true);
-        }
-        catch {
-          Close (true);
-        }
       }
     }
 
