@@ -8,7 +8,7 @@
  * The MIT License
  *
  * Copyright (c) 2005 Novell, Inc. (http://www.novell.com)
- * Copyright (c) 2012-2020 sta.blockhead
+ * Copyright (c) 2012-2021 sta.blockhead
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -60,10 +60,10 @@ namespace WebSocketSharp.Net
   {
     #region Private Fields
 
+    private int                   _attempts;
     private byte[]                _buffer;
     private static readonly int   _bufferLength;
     private HttpListenerContext   _context;
-    private bool                  _contextRegistered;
     private StringBuilder         _currentLine;
     private InputState            _inputState;
     private RequestStream         _inputStream;
@@ -199,7 +199,7 @@ namespace WebSocketSharp.Net
         closeSocket ();
       }
 
-      unregisterContext ();
+      _context.Unregister ();
       _listener.RemoveConnection (this);
     }
 
@@ -269,7 +269,7 @@ namespace WebSocketSharp.Net
     private static void onRead (IAsyncResult asyncResult)
     {
       var conn = (HttpConnection) asyncResult.AsyncState;
-      var current = conn._reuses;
+      var current = conn._attempts;
 
       if (conn._socket == null)
         return;
@@ -278,10 +278,8 @@ namespace WebSocketSharp.Net
         if (conn._socket == null)
           return;
 
-        if (!conn._timeoutCanceled[current]) {
-          conn._timer.Change (Timeout.Infinite, Timeout.Infinite);
-          conn._timeoutCanceled[current] = true;
-        }
+        conn._timer.Change (Timeout.Infinite, Timeout.Infinite);
+        conn._timeoutCanceled[current] = true;
 
         var nread = 0;
 
@@ -319,7 +317,15 @@ namespace WebSocketSharp.Net
           HttpListener lsnr;
 
           if (conn._listener.TrySearchHttpListener (url, out lsnr)) {
-            conn.registerContext (lsnr);
+            if (!lsnr.AuthenticateContext (conn._context))
+              return;
+
+            if (!lsnr.RegisterContext (conn._context)) {
+              conn._context.ErrorStatusCode = 503;
+              conn._context.SendError ();
+
+              return;
+            }
 
             return;
           }
@@ -330,21 +336,14 @@ namespace WebSocketSharp.Net
           return;
         }
 
-        try {
-          conn._stream.BeginRead (conn._buffer, 0, _bufferLength, onRead, conn);
-        }
-        catch (Exception) {
-          // TODO: Logging.
-
-          conn.close ();
-        }
+        conn.BeginReadRequest ();
       }
     }
 
     private static void onTimeout (object state)
     {
       var conn = (HttpConnection) state;
-      var current = conn._reuses;
+      var current = conn._attempts;
 
       if (conn._socket == null)
         return;
@@ -451,40 +450,15 @@ namespace WebSocketSharp.Net
       return ret;
     }
 
-    private void registerContext (HttpListener listener)
-    {
-      _context.Listener = listener;
-
-      if (!_context.Authenticate ())
-        return;
-
-      if (!_context.Register ()) {
-        _context.ErrorStatusCode = 503;
-        _context.SendError ();
-
-        return;
-      }
-
-      _contextRegistered = true;
-    }
-
-    private void unregisterContext ()
-    {
-      if (!_contextRegistered)
-        return;
-
-      _context.Unregister ();
-
-      _contextRegistered = false;
-    }
-
     #endregion
 
     #region Internal Methods
 
     internal void BeginReadRequest ()
     {
-      _timeoutCanceled.Add (_reuses, false);
+      _attempts++;
+
+      _timeoutCanceled.Add (_attempts, false);
       _timer.Change (_timeout, Timeout.Infinite);
 
       try {
@@ -530,7 +504,7 @@ namespace WebSocketSharp.Net
         }
 
         disposeRequestBuffer ();
-        unregisterContext ();
+        _context.Unregister ();
 
         _reuses++;
 

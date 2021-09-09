@@ -8,7 +8,7 @@
  * The MIT License
  *
  * Copyright (c) 2005 Novell, Inc. (http://www.novell.com)
- * Copyright (c) 2012-2016 sta.blockhead
+ * Copyright (c) 2012-2021 sta.blockhead
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -71,7 +71,8 @@ namespace WebSocketSharp.Net
     private bool                                             _disposed;
     private bool                                             _ignoreWriteExceptions;
     private volatile bool                                    _listening;
-    private Logger                                           _logger;
+    private Logger                                           _log;
+    private string                                           _objectName;
     private HttpListenerPrefixCollection                     _prefixes;
     private string                                           _realm;
     private bool                                             _reuseAddress;
@@ -103,7 +104,8 @@ namespace WebSocketSharp.Net
       _contextRegistry = new LinkedList<HttpListenerContext> ();
       _contextRegistrySync = ((ICollection) _contextRegistry).SyncRoot;
 
-      _logger = new Logger ();
+      _log = new Logger ();
+      _objectName = GetType ().ToString ();
       _prefixes = new HttpListenerPrefixCollection (this);
       _waitQueue = new Queue<HttpListenerAsyncResult> ();
     }
@@ -111,12 +113,6 @@ namespace WebSocketSharp.Net
     #endregion
 
     #region Internal Properties
-
-    internal bool IsDisposed {
-      get {
-        return _disposed;
-      }
-    }
 
     internal bool ReuseAddress {
       get {
@@ -136,109 +132,162 @@ namespace WebSocketSharp.Net
     /// Gets or sets the scheme used to authenticate the clients.
     /// </summary>
     /// <value>
-    /// One of the <see cref="WebSocketSharp.Net.AuthenticationSchemes"/> enum values,
-    /// represents the scheme used to authenticate the clients. The default value is
-    /// <see cref="WebSocketSharp.Net.AuthenticationSchemes.Anonymous"/>.
+    ///   <para>
+    ///   One of the <see cref="WebSocketSharp.Net.AuthenticationSchemes"/>
+    ///   enum values.
+    ///   </para>
+    ///   <para>
+    ///   It represents the scheme used to authenticate the clients.
+    ///   </para>
+    ///   <para>
+    ///   The default value is
+    ///   <see cref="WebSocketSharp.Net.AuthenticationSchemes.Anonymous"/>.
+    ///   </para>
     /// </value>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public AuthenticationSchemes AuthenticationSchemes {
       get {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         return _authSchemes;
       }
 
       set {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         _authSchemes = value;
       }
     }
 
     /// <summary>
-    /// Gets or sets the delegate called to select the scheme used to authenticate the clients.
+    /// Gets or sets the delegate called to select the scheme used to
+    /// authenticate the clients.
     /// </summary>
     /// <remarks>
-    /// If you set this property, the listener uses the authentication scheme selected by
-    /// the delegate for each request. Or if you don't set, the listener uses the value of
-    /// the <see cref="HttpListener.AuthenticationSchemes"/> property as the authentication
-    /// scheme for all requests.
+    ///   <para>
+    ///   If this property is set, the listener uses the authentication
+    ///   scheme selected by the delegate for each request.
+    ///   </para>
+    ///   <para>
+    ///   Or if this property is not set, the listener uses the value of
+    ///   the <see cref="HttpListener.AuthenticationSchemes"/> property
+    ///   as the authentication scheme for all requests.
+    ///   </para>
     /// </remarks>
     /// <value>
-    /// A <c>Func&lt;<see cref="HttpListenerRequest"/>, <see cref="AuthenticationSchemes"/>&gt;</c>
-    /// delegate that references the method used to select an authentication scheme. The default
-    /// value is <see langword="null"/>.
+    ///   <para>
+    ///   A <c>Func&lt;<see cref="HttpListenerRequest"/>,
+    ///   <see cref="AuthenticationSchemes"/>&gt;</c> delegate or
+    ///   <see langword="null"/> if not needed.
+    ///   </para>
+    ///   <para>
+    ///   The delegate references the method used to select
+    ///   an authentication scheme.
+    ///   </para>
+    ///   <para>
+    ///   The default value is <see langword="null"/>.
+    ///   </para>
     /// </value>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public Func<HttpListenerRequest, AuthenticationSchemes> AuthenticationSchemeSelector {
       get {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         return _authSchemeSelector;
       }
 
       set {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         _authSchemeSelector = value;
       }
     }
 
     /// <summary>
-    /// Gets or sets the path to the folder in which stores the certificate files used to
-    /// authenticate the server on the secure connection.
+    /// Gets or sets the path to the folder in which stores the certificate
+    /// files used to authenticate the server on the secure connection.
     /// </summary>
     /// <remarks>
     ///   <para>
-    ///   This property represents the path to the folder in which stores the certificate files
-    ///   associated with each port number of added URI prefixes. A set of the certificate files
-    ///   is a pair of the <c>'port number'.cer</c> (DER) and <c>'port number'.key</c>
-    ///   (DER, RSA Private Key).
+    ///   This property represents the path to the folder in which stores
+    ///   the certificate files associated with each port number of added
+    ///   URI prefixes.
     ///   </para>
     ///   <para>
-    ///   If this property is <see langword="null"/> or empty, the result of
-    ///   <c>System.Environment.GetFolderPath
-    ///   (<see cref="Environment.SpecialFolder.ApplicationData"/>)</c> is used as the default path.
+    ///   A set of the certificate files is a pair of &lt;port number&gt;.cer
+    ///   (DER) and &lt;port number&gt;.key (DER, RSA Private Key).
+    ///   </para>
+    ///   <para>
+    ///   If this property is <see langword="null"/> or an empty string,
+    ///   the result of <c>System.Environment.GetFolderPath (<see
+    ///   cref="Environment.SpecialFolder.ApplicationData"/>)</c>
+    ///   is used as the default path.
     ///   </para>
     /// </remarks>
     /// <value>
-    /// A <see cref="string"/> that represents the path to the folder in which stores
-    /// the certificate files. The default value is <see langword="null"/>.
+    ///   <para>
+    ///   A <see cref="string"/> that represents the path to the folder
+    ///   in which stores the certificate files.
+    ///   </para>
+    ///   <para>
+    ///   The default value is <see langword="null"/>.
+    ///   </para>
     /// </value>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public string CertificateFolderPath {
       get {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         return _certFolderPath;
       }
 
       set {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         _certFolderPath = value;
       }
     }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the listener returns exceptions that occur when
-    /// sending the response to the client.
+    /// Gets or sets a value indicating whether the listener returns
+    /// exceptions that occur when sending the response to the client.
     /// </summary>
     /// <value>
-    /// <c>true</c> if the listener shouldn't return those exceptions; otherwise, <c>false</c>.
-    /// The default value is <c>false</c>.
+    ///   <para>
+    ///   <c>true</c> if the listener should not return those exceptions;
+    ///   otherwise, <c>false</c>.
+    ///   </para>
+    ///   <para>
+    ///   The default value is <c>false</c>.
+    ///   </para>
     /// </value>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public bool IgnoreWriteExceptions {
       get {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         return _ignoreWriteExceptions;
       }
 
       set {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         _ignoreWriteExceptions = value;
       }
     }
@@ -256,7 +305,8 @@ namespace WebSocketSharp.Net
     }
 
     /// <summary>
-    /// Gets a value indicating whether the listener can be used with the current operating system.
+    /// Gets a value indicating whether the listener can be used with
+    /// the current operating system.
     /// </summary>
     /// <value>
     /// <c>true</c>.
@@ -271,16 +321,20 @@ namespace WebSocketSharp.Net
     /// Gets the logging functions.
     /// </summary>
     /// <remarks>
-    /// The default logging level is <see cref="LogLevel.Error"/>. If you would like to change it,
-    /// you should set the <c>Log.Level</c> property to any of the <see cref="LogLevel"/> enum
-    /// values.
+    ///   <para>
+    ///   The default logging level is <see cref="LogLevel.Error"/>.
+    ///   </para>
+    ///   <para>
+    ///   If you would like to change it, you should set the <c>Log.Level</c>
+    ///   property to any of the <see cref="LogLevel"/> enum values.
+    ///   </para>
     /// </remarks>
     /// <value>
     /// A <see cref="Logger"/> that provides the logging functions.
     /// </value>
     public Logger Log {
       get {
-        return _logger;
+        return _log;
       }
     }
 
@@ -288,14 +342,17 @@ namespace WebSocketSharp.Net
     /// Gets the URI prefixes handled by the listener.
     /// </summary>
     /// <value>
-    /// A <see cref="HttpListenerPrefixCollection"/> that contains the URI prefixes.
+    /// A <see cref="HttpListenerPrefixCollection"/> that contains the URI
+    /// prefixes.
     /// </value>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public HttpListenerPrefixCollection Prefixes {
       get {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         return _prefixes;
       }
     }
@@ -304,48 +361,56 @@ namespace WebSocketSharp.Net
     /// Gets or sets the name of the realm associated with the listener.
     /// </summary>
     /// <remarks>
-    /// If this property is <see langword="null"/> or empty, <c>"SECRET AREA"</c> will be used as
-    /// the name of the realm.
+    /// If this property is <see langword="null"/> or an empty string,
+    /// "SECRET AREA" will be used as the name of the realm.
     /// </remarks>
     /// <value>
-    /// A <see cref="string"/> that represents the name of the realm. The default value is
-    /// <see langword="null"/>.
+    ///   <para>
+    ///   A <see cref="string"/> that represents the name of the realm.
+    ///   </para>
+    ///   <para>
+    ///   The default value is <see langword="null"/>.
+    ///   </para>
     /// </value>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public string Realm {
       get {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         return _realm;
       }
 
       set {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         _realm = value;
       }
     }
 
     /// <summary>
-    /// Gets or sets the SSL configuration used to authenticate the server and
+    /// Gets the SSL configuration used to authenticate the server and
     /// optionally the client for secure connection.
     /// </summary>
     /// <value>
-    /// A <see cref="ServerSslConfiguration"/> that represents the configuration used to
-    /// authenticate the server and optionally the client for secure connection.
+    /// A <see cref="ServerSslConfiguration"/> that represents the SSL
+    /// configuration for secure connection.
     /// </value>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public ServerSslConfiguration SslConfiguration {
       get {
-        CheckDisposed ();
-        return _sslConfig ?? (_sslConfig = new ServerSslConfiguration ());
-      }
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
 
-      set {
-        CheckDisposed ();
-        _sslConfig = value;
+        if (_sslConfig == null)
+          _sslConfig = new ServerSslConfiguration ();
+
+        return _sslConfig;
       }
     }
 
@@ -355,7 +420,7 @@ namespace WebSocketSharp.Net
     /// additional requests on the same connection.
     /// </summary>
     /// <remarks>
-    /// This property isn't currently supported and always throws
+    /// This property is not currently supported and always throws
     /// a <see cref="NotSupportedException"/>.
     /// </remarks>
     /// <value>
@@ -376,25 +441,37 @@ namespace WebSocketSharp.Net
     }
 
     /// <summary>
-    /// Gets or sets the delegate called to find the credentials for an identity used to
-    /// authenticate a client.
+    /// Gets or sets the delegate called to find the credentials for
+    /// an identity used to authenticate a client.
     /// </summary>
     /// <value>
-    /// A <c>Func&lt;<see cref="IIdentity"/>, <see cref="NetworkCredential"/>&gt;</c> delegate
-    /// that references the method used to find the credentials. The default value is
-    /// <see langword="null"/>.
+    ///   <para>
+    ///   A <c>Func&lt;<see cref="IIdentity"/>,
+    ///   <see cref="NetworkCredential"/>&gt;</c> delegate or
+    ///   <see langword="null"/> if not needed.
+    ///   </para>
+    ///   <para>
+    ///   It references the method used to find the credentials.
+    ///   </para>
+    ///   <para>
+    ///   The default value is <see langword="null"/>.
+    ///   </para>
     /// </value>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public Func<IIdentity, NetworkCredential> UserCredentialsFinder {
       get {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         return _userCredFinder;
       }
 
       set {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
+
         _userCredFinder = value;
       }
     }
@@ -402,6 +479,33 @@ namespace WebSocketSharp.Net
     #endregion
 
     #region Private Methods
+
+    private HttpListenerAsyncResult beginGetContext (
+      AsyncCallback callback, object state
+    )
+    {
+      lock (_contextRegistrySync) {
+        if (!_listening) {
+          var msg = _disposed
+                    ? "The listener is closed."
+                    : "The listener is stopped.";
+
+          throw new HttpListenerException (995, msg);
+        }
+
+        var ares = new HttpListenerAsyncResult (callback, state);
+
+        if (_contextQueue.Count == 0) {
+          _waitQueue.Enqueue (ares);
+        }
+        else {
+          var ctx = _contextQueue.Dequeue ();
+          ares.Complete (ctx, true);
+        }
+
+        return ares;
+      }
+    }
 
     private void cleanupContextQueue (bool force)
     {
@@ -440,7 +544,7 @@ namespace WebSocketSharp.Net
         ctx.Connection.Close (true);
     }
 
-    private void cleanupWaitQueue (Exception exception)
+    private void cleanupWaitQueue (string message)
     {
       if (_waitQueue.Count == 0)
         return;
@@ -449,94 +553,41 @@ namespace WebSocketSharp.Net
 
       _waitQueue.Clear ();
 
-      foreach (var ares in aress)
-        ares.Complete (exception);
+      foreach (var ares in aress) {
+        var ex = new HttpListenerException (995, message);
+        ares.Complete (ex);
+      }
     }
 
     private void close (bool force)
     {
-      if (_listening) {
-        _listening = false;
+      if (!_listening) {
+        _disposed = true;
 
-        cleanupContextQueue (force);
-        cleanupContextRegistry ();
-
-        var name = GetType ().ToString ();
-        var ex = new ObjectDisposedException (name);
-        cleanupWaitQueue (ex);
-
-        EndPointManager.RemoveListener (this);
+        return;
       }
+
+      _listening = false;
+
+      cleanupContextQueue (force);
+      cleanupContextRegistry ();
+
+      var msg = "The listener is closed.";
+      cleanupWaitQueue (msg);
+
+      EndPointManager.RemoveListener (this);
 
       _disposed = true;
     }
 
-    #endregion
-
-    #region Internal Methods
-
-    internal HttpListenerAsyncResult BeginGetContext (
-      HttpListenerAsyncResult asyncResult
-    )
-    {
-      lock (_contextRegistrySync) {
-        if (!_listening)
-          throw new HttpListenerException (995);
-
-        if (_contextQueue.Count == 0) {
-          _waitQueue.Enqueue (asyncResult);
-        }
-        else {
-          var ctx = _contextQueue.Dequeue ();
-          asyncResult.Complete (ctx, true);
-        }
-
-        return asyncResult;
-      }
-    }
-
-    internal void CheckDisposed ()
-    {
-      if (_disposed)
-        throw new ObjectDisposedException (GetType ().ToString ());
-    }
-
-    internal string GetRealm ()
+    private string getRealm ()
     {
       var realm = _realm;
 
       return realm != null && realm.Length > 0 ? realm : _defaultRealm;
     }
 
-    internal Func<IIdentity, NetworkCredential> GetUserCredentialsFinder ()
-    {
-      return _userCredFinder;
-    }
-
-    internal bool RegisterContext (HttpListenerContext context)
-    {
-      if (!_listening)
-        return false;
-
-      lock (_contextRegistrySync) {
-        if (!_listening)
-          return false;
-
-        _contextRegistry.AddLast (context);
-
-        if (_waitQueue.Count == 0) {
-          _contextQueue.Enqueue (context);
-        }
-        else {
-          var ares = _waitQueue.Dequeue ();
-          ares.Complete (context);
-        }
-
-        return true;
-      }
-    }
-
-    internal AuthenticationSchemes SelectAuthenticationScheme (
+    private AuthenticationSchemes selectAuthenticationScheme (
       HttpListenerRequest request
     )
     {
@@ -550,6 +601,80 @@ namespace WebSocketSharp.Net
       }
       catch {
         return AuthenticationSchemes.None;
+      }
+    }
+
+    #endregion
+
+    #region Internal Methods
+
+    internal bool AuthenticateContext (HttpListenerContext context)
+    {
+      var req = context.Request;
+      var schm = selectAuthenticationScheme (req);
+
+      if (schm == AuthenticationSchemes.Anonymous)
+        return true;
+
+      if (schm == AuthenticationSchemes.None) {
+        context.ErrorStatusCode = 403;
+        context.ErrorMessage = "Authentication not allowed";
+
+        context.SendError ();
+
+        return false;
+      }
+
+      var realm = getRealm ();
+      var user = HttpUtility.CreateUser (
+                   req.Headers["Authorization"],
+                   schm,
+                   realm,
+                   req.HttpMethod,
+                   _userCredFinder
+                 );
+
+      var authenticated = user != null && user.Identity.IsAuthenticated;
+
+      if (!authenticated) {
+        context.SendAuthenticationChallenge (schm, realm);
+
+        return false;
+      }
+
+      context.User = user;
+
+      return true;
+    }
+
+    internal void CheckDisposed ()
+    {
+      if (_disposed)
+        throw new ObjectDisposedException (_objectName);
+    }
+
+    internal bool RegisterContext (HttpListenerContext context)
+    {
+      if (!_listening)
+        return false;
+
+      lock (_contextRegistrySync) {
+        if (!_listening)
+          return false;
+
+        context.Listener = this;
+
+        _contextRegistry.AddLast (context);
+
+        if (_waitQueue.Count == 0) {
+          _contextQueue.Enqueue (context);
+        }
+        else {
+          var ares = _waitQueue.Dequeue ();
+          ares.Complete (context, false);
+        }
+
+        return true;
       }
     }
 
@@ -615,12 +740,16 @@ namespace WebSocketSharp.Net
     ///   This listener has not been started or is currently stopped.
     ///   </para>
     /// </exception>
+    /// <exception cref="HttpListenerException">
+    /// This method is canceled.
+    /// </exception>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
-    public IAsyncResult BeginGetContext (AsyncCallback callback, Object state)
+    public IAsyncResult BeginGetContext (AsyncCallback callback, object state)
     {
-      CheckDisposed ();
+      if (_disposed)
+        throw new ObjectDisposedException (_objectName);
 
       if (_prefixes.Count == 0) {
         var msg = "The listener has no URI prefix on which listens.";
@@ -634,7 +763,7 @@ namespace WebSocketSharp.Net
         throw new InvalidOperationException (msg);
       }
 
-      return BeginGetContext (new HttpListenerAsyncResult (callback, state));
+      return beginGetContext (callback, state);
     }
 
     /// <summary>
@@ -677,12 +806,16 @@ namespace WebSocketSharp.Net
     /// <exception cref="InvalidOperationException">
     /// This method was already called for <paramref name="asyncResult"/>.
     /// </exception>
+    /// <exception cref="HttpListenerException">
+    /// This method is canceled.
+    /// </exception>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public HttpListenerContext EndGetContext (IAsyncResult asyncResult)
     {
-      CheckDisposed ();
+      if (_disposed)
+        throw new ObjectDisposedException (_objectName);
 
       if (asyncResult == null)
         throw new ArgumentNullException ("asyncResult");
@@ -695,18 +828,20 @@ namespace WebSocketSharp.Net
         throw new ArgumentException (msg, "asyncResult");
       }
 
-      if (ares.EndCalled) {
-        var msg = "This IAsyncResult instance cannot be reused.";
+      lock (ares.SyncRoot) {
+        if (ares.EndCalled) {
+          var msg = "This IAsyncResult instance cannot be reused.";
 
-        throw new InvalidOperationException (msg);
+          throw new InvalidOperationException (msg);
+        }
+
+        ares.EndCalled = true;
       }
-
-      ares.EndCalled = true;
 
       if (!ares.IsCompleted)
         ares.AsyncWaitHandle.WaitOne ();
 
-      return ares.GetContext (); // This may throw an exception.
+      return ares.Context;
     }
 
     /// <summary>
@@ -730,12 +865,16 @@ namespace WebSocketSharp.Net
     ///   This listener has not been started or is currently stopped.
     ///   </para>
     /// </exception>
+    /// <exception cref="HttpListenerException">
+    /// This method is canceled.
+    /// </exception>
     /// <exception cref="ObjectDisposedException">
     /// This listener has been closed.
     /// </exception>
     public HttpListenerContext GetContext ()
     {
-      CheckDisposed ();
+      if (_disposed)
+        throw new ObjectDisposedException (_objectName);
 
       if (_prefixes.Count == 0) {
         var msg = "The listener has no URI prefix on which listens.";
@@ -749,10 +888,13 @@ namespace WebSocketSharp.Net
         throw new InvalidOperationException (msg);
       }
 
-      var ares = BeginGetContext (new HttpListenerAsyncResult (null, null));
-      ares.InGet = true;
+      var ares = beginGetContext (null, null);
+      ares.EndCalled = true;
 
-      return EndGetContext (ares);
+      if (!ares.IsCompleted)
+        ares.AsyncWaitHandle.WaitOne ();
+
+      return ares.Context;
     }
 
     /// <summary>
@@ -763,13 +905,12 @@ namespace WebSocketSharp.Net
     /// </exception>
     public void Start ()
     {
-      CheckDisposed ();
-
-      if (_listening)
-        return;
+      if (_disposed)
+        throw new ObjectDisposedException (_objectName);
 
       lock (_contextRegistrySync) {
-        CheckDisposed ();
+        if (_disposed)
+          throw new ObjectDisposedException (_objectName);
 
         if (_listening)
           return;
@@ -788,10 +929,8 @@ namespace WebSocketSharp.Net
     /// </exception>
     public void Stop ()
     {
-      CheckDisposed ();
-
-      if (!_listening)
-        return;
+      if (_disposed)
+        throw new ObjectDisposedException (_objectName);
 
       lock (_contextRegistrySync) {
         if (!_listening)
@@ -803,8 +942,7 @@ namespace WebSocketSharp.Net
         cleanupContextRegistry ();
 
         var msg = "The listener is stopped.";
-        var ex = new HttpListenerException (995, msg);
-        cleanupWaitQueue (ex);
+        cleanupWaitQueue (msg);
 
         EndPointManager.RemoveListener (this);
       }

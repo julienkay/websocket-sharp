@@ -347,15 +347,12 @@ namespace WebSocketSharp.Server
       }
 
       set {
-        string msg;
-        if (!canSet (out msg)) {
-          _log.Warn (msg);
-          return;
-        }
-
         lock (_sync) {
+          string msg;
+
           if (!canSet (out msg)) {
             _log.Warn (msg);
+
             return;
           }
 
@@ -390,15 +387,12 @@ namespace WebSocketSharp.Server
       }
 
       set {
-        string msg;
-        if (!canSet (out msg)) {
-          _log.Warn (msg);
-          return;
-        }
-
         lock (_sync) {
+          string msg;
+
           if (!canSet (out msg)) {
             _log.Warn (msg);
+
             return;
           }
 
@@ -423,7 +417,7 @@ namespace WebSocketSharp.Server
     /// Gets a value indicating whether secure connections are provided.
     /// </summary>
     /// <value>
-    /// <c>true</c> if this instance provides secure connections; otherwise,
+    /// <c>true</c> if the server provides secure connections; otherwise,
     /// <c>false</c>.
     /// </value>
     public bool IsSecure {
@@ -488,24 +482,25 @@ namespace WebSocketSharp.Server
     }
 
     /// <summary>
-    /// Gets or sets the realm used for authentication.
+    /// Gets or sets the name of the realm associated with the server.
     /// </summary>
     /// <remarks>
     ///   <para>
-    ///   "SECRET AREA" is used as the realm if the value is
+    ///   "SECRET AREA" is used as the name of the realm if the value is
     ///   <see langword="null"/> or an empty string.
     ///   </para>
     ///   <para>
-    ///   The set operation does nothing if the server has
-    ///   already started or it is shutting down.
+    ///   The set operation does nothing if the server has already started
+    ///   or it is shutting down.
     ///   </para>
     /// </remarks>
     /// <value>
     ///   <para>
-    ///   A <see cref="string"/> or <see langword="null"/> by default.
+    ///   A <see cref="string"/> that represents the name of the realm or
+    ///   <see langword="null"/>.
     ///   </para>
     ///   <para>
-    ///   That string represents the name of the realm.
+    ///   The default value is <see langword="null"/>.
     ///   </para>
     /// </value>
     public string Realm {
@@ -514,15 +509,12 @@ namespace WebSocketSharp.Server
       }
 
       set {
-        string msg;
-        if (!canSet (out msg)) {
-          _log.Warn (msg);
-          return;
-        }
-
         lock (_sync) {
+          string msg;
+
           if (!canSet (out msg)) {
             _log.Warn (msg);
+
             return;
           }
 
@@ -560,15 +552,12 @@ namespace WebSocketSharp.Server
       }
 
       set {
-        string msg;
-        if (!canSet (out msg)) {
-          _log.Warn (msg);
-          return;
-        }
-
         lock (_sync) {
+          string msg;
+
           if (!canSet (out msg)) {
             _log.Warn (msg);
+
             return;
           }
 
@@ -581,7 +570,7 @@ namespace WebSocketSharp.Server
     /// Gets the configuration for secure connection.
     /// </summary>
     /// <remarks>
-    /// This configuration will be referenced when attempts to start,
+    /// The configuration will be referenced when attempts to start,
     /// so it must be configured before the start method is called.
     /// </remarks>
     /// <value>
@@ -589,12 +578,13 @@ namespace WebSocketSharp.Server
     /// the configuration used to provide secure connections.
     /// </value>
     /// <exception cref="InvalidOperationException">
-    /// This instance does not provide secure connections.
+    /// The server does not provide secure connections.
     /// </exception>
     public ServerSslConfiguration SslConfiguration {
       get {
         if (!_secure) {
-          var msg = "This instance does not provide secure connections.";
+          var msg = "The server does not provide secure connections.";
+
           throw new InvalidOperationException (msg);
         }
 
@@ -637,15 +627,12 @@ namespace WebSocketSharp.Server
       }
 
       set {
-        string msg;
-        if (!canSet (out msg)) {
-          _log.Warn (msg);
-          return;
-        }
-
         lock (_sync) {
+          string msg;
+
           if (!canSet (out msg)) {
             _log.Warn (msg);
+
             return;
           }
 
@@ -655,8 +642,8 @@ namespace WebSocketSharp.Server
     }
 
     /// <summary>
-    /// Gets or sets the time to wait for the response to the WebSocket Ping or
-    /// Close.
+    /// Gets or sets the time to wait for the response to the WebSocket
+    /// Ping or Close.
     /// </summary>
     /// <remarks>
     /// The set operation does nothing if the server has already started or
@@ -741,11 +728,13 @@ namespace WebSocketSharp.Server
 
       if (_state == ServerState.Start) {
         message = "The server has already started.";
+
         return false;
       }
 
       if (_state == ServerState.ShuttingDown) {
         message = "The server is shutting down.";
+
         return false;
       }
 
@@ -759,23 +748,10 @@ namespace WebSocketSharp.Server
              || name == _hostname;
     }
 
-    private static bool checkSslConfiguration (
-      ServerSslConfiguration configuration, out string message
-    )
-    {
-      message = null;
-
-      if (configuration.ServerCertificate == null) {
-        message = "There is no server certificate for secure connection.";
-        return false;
-      }
-
-      return true;
-    }
-
     private string getRealm ()
     {
       var realm = _realm;
+
       return realm != null && realm.Length > 0 ? realm : _defaultRealm;
     }
 
@@ -954,21 +930,6 @@ namespace WebSocketSharp.Server
 
     private void stop (ushort code, string reason)
     {
-      if (_state == ServerState.Ready) {
-        _log.Info ("The server is not started.");
-        return;
-      }
-
-      if (_state == ServerState.ShuttingDown) {
-        _log.Info ("The server is shutting down.");
-        return;
-      }
-
-      if (_state == ServerState.Stop) {
-        _log.Info ("The server has already stopped.");
-        return;
-      }
-
       lock (_sync) {
         if (_state == ServerState.ShuttingDown) {
           _log.Info ("The server is shutting down.");
@@ -1330,11 +1291,14 @@ namespace WebSocketSharp.Server
       ServerSslConfiguration sslConfig = null;
 
       if (_secure) {
-        sslConfig = new ServerSslConfiguration (getSslConfiguration ());
+        var src = getSslConfiguration ();
+        sslConfig = new ServerSslConfiguration (src);
 
-        string msg;
-        if (!checkSslConfiguration (sslConfig, out msg))
+        if (sslConfig.ServerCertificate == null) {
+          var msg = "There is no server certificate for secure connection.";
+
           throw new InvalidOperationException (msg);
+        }
       }
 
       start (sslConfig);
@@ -1343,174 +1307,34 @@ namespace WebSocketSharp.Server
     /// <summary>
     /// Stops receiving incoming handshake requests.
     /// </summary>
+    /// <remarks>
+    /// This method does nothing if the server is not started,
+    /// it is shutting down, or it has already stopped.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// The underlying <see cref="TcpListener"/> has failed to stop.
     /// </exception>
     public void Stop ()
     {
+      if (_state == ServerState.Ready) {
+        _log.Info ("The server is not started.");
+
+        return;
+      }
+
+      if (_state == ServerState.ShuttingDown) {
+        _log.Info ("The server is shutting down.");
+
+        return;
+      }
+
+      if (_state == ServerState.Stop) {
+        _log.Info ("The server has already stopped.");
+
+        return;
+      }
+
       stop (1001, String.Empty);
-    }
-
-    /// <summary>
-    /// Stops receiving incoming handshake requests and closes each connection
-    /// with the specified code and reason.
-    /// </summary>
-    /// <param name="code">
-    ///   <para>
-    ///   A <see cref="ushort"/> that represents the status code indicating
-    ///   the reason for the close.
-    ///   </para>
-    ///   <para>
-    ///   The status codes are defined in
-    ///   <see href="http://tools.ietf.org/html/rfc6455#section-7.4">
-    ///   Section 7.4</see> of RFC 6455.
-    ///   </para>
-    /// </param>
-    /// <param name="reason">
-    ///   <para>
-    ///   A <see cref="string"/> that represents the reason for the close.
-    ///   </para>
-    ///   <para>
-    ///   The size must be 123 bytes or less in UTF-8.
-    ///   </para>
-    /// </param>
-    /// <exception cref="ArgumentOutOfRangeException">
-    ///   <para>
-    ///   <paramref name="code"/> is less than 1000 or greater than 4999.
-    ///   </para>
-    ///   <para>
-    ///   -or-
-    ///   </para>
-    ///   <para>
-    ///   The size of <paramref name="reason"/> is greater than 123 bytes.
-    ///   </para>
-    /// </exception>
-    /// <exception cref="ArgumentException">
-    ///   <para>
-    ///   <paramref name="code"/> is 1010 (mandatory extension).
-    ///   </para>
-    ///   <para>
-    ///   -or-
-    ///   </para>
-    ///   <para>
-    ///   <paramref name="code"/> is 1005 (no status) and there is reason.
-    ///   </para>
-    ///   <para>
-    ///   -or-
-    ///   </para>
-    ///   <para>
-    ///   <paramref name="reason"/> could not be UTF-8-encoded.
-    ///   </para>
-    /// </exception>
-    /// <exception cref="InvalidOperationException">
-    /// The underlying <see cref="TcpListener"/> has failed to stop.
-    /// </exception>
-    [Obsolete ("This method will be removed.")]
-    public void Stop (ushort code, string reason)
-    {
-      if (!code.IsCloseStatusCode ()) {
-        var msg = "Less than 1000 or greater than 4999.";
-        throw new ArgumentOutOfRangeException ("code", msg);
-      }
-
-      if (code == 1010) {
-        var msg = "1010 cannot be used.";
-        throw new ArgumentException (msg, "code");
-      }
-
-      if (!reason.IsNullOrEmpty ()) {
-        if (code == 1005) {
-          var msg = "1005 cannot be used.";
-          throw new ArgumentException (msg, "code");
-        }
-
-        byte[] bytes;
-        if (!reason.TryGetUTF8EncodedBytes (out bytes)) {
-          var msg = "It could not be UTF-8-encoded.";
-          throw new ArgumentException (msg, "reason");
-        }
-
-        if (bytes.Length > 123) {
-          var msg = "Its size is greater than 123 bytes.";
-          throw new ArgumentOutOfRangeException ("reason", msg);
-        }
-      }
-
-      stop (code, reason);
-    }
-
-    /// <summary>
-    /// Stops receiving incoming handshake requests and closes each connection
-    /// with the specified code and reason.
-    /// </summary>
-    /// <param name="code">
-    ///   <para>
-    ///   One of the <see cref="CloseStatusCode"/> enum values.
-    ///   </para>
-    ///   <para>
-    ///   It represents the status code indicating the reason for the close.
-    ///   </para>
-    /// </param>
-    /// <param name="reason">
-    ///   <para>
-    ///   A <see cref="string"/> that represents the reason for the close.
-    ///   </para>
-    ///   <para>
-    ///   The size must be 123 bytes or less in UTF-8.
-    ///   </para>
-    /// </param>
-    /// <exception cref="ArgumentException">
-    ///   <para>
-    ///   <paramref name="code"/> is
-    ///   <see cref="CloseStatusCode.MandatoryExtension"/>.
-    ///   </para>
-    ///   <para>
-    ///   -or-
-    ///   </para>
-    ///   <para>
-    ///   <paramref name="code"/> is
-    ///   <see cref="CloseStatusCode.NoStatus"/> and there is reason.
-    ///   </para>
-    ///   <para>
-    ///   -or-
-    ///   </para>
-    ///   <para>
-    ///   <paramref name="reason"/> could not be UTF-8-encoded.
-    ///   </para>
-    /// </exception>
-    /// <exception cref="ArgumentOutOfRangeException">
-    /// The size of <paramref name="reason"/> is greater than 123 bytes.
-    /// </exception>
-    /// <exception cref="InvalidOperationException">
-    /// The underlying <see cref="TcpListener"/> has failed to stop.
-    /// </exception>
-    [Obsolete ("This method will be removed.")]
-    public void Stop (CloseStatusCode code, string reason)
-    {
-      if (code == CloseStatusCode.MandatoryExtension) {
-        var msg = "MandatoryExtension cannot be used.";
-        throw new ArgumentException (msg, "code");
-      }
-
-      if (!reason.IsNullOrEmpty ()) {
-        if (code == CloseStatusCode.NoStatus) {
-          var msg = "NoStatus cannot be used.";
-          throw new ArgumentException (msg, "code");
-        }
-
-        byte[] bytes;
-        if (!reason.TryGetUTF8EncodedBytes (out bytes)) {
-          var msg = "It could not be UTF-8-encoded.";
-          throw new ArgumentException (msg, "reason");
-        }
-
-        if (bytes.Length > 123) {
-          var msg = "Its size is greater than 123 bytes.";
-          throw new ArgumentOutOfRangeException ("reason", msg);
-        }
-      }
-
-      stop ((ushort) code, reason);
     }
 
     #endregion

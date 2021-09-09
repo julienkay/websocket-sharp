@@ -153,12 +153,13 @@ namespace WebSocketSharp.Net
     }
 
     /// <summary>
-    /// Gets the client information (identity, authentication, and security roles).
+    /// Gets the client information (identity, authentication, and security
+    /// roles).
     /// </summary>
     /// <value>
     ///   <para>
-    ///   A <see cref="IPrincipal"/> instance or <see langword="null"/> if not
-    ///   authenticated.
+    ///   A <see cref="IPrincipal"/> instance or <see langword="null"/>
+    ///   if not authenticated.
     ///   </para>
     ///   <para>
     ///   The instance describes the client.
@@ -167,6 +168,10 @@ namespace WebSocketSharp.Net
     public IPrincipal User {
       get {
         return _user;
+      }
+
+      internal set {
+        _user = value;
       }
     }
 
@@ -192,53 +197,9 @@ namespace WebSocketSharp.Net
                );
     }
 
-    private void sendAuthenticationChallenge (string challenge)
-    {
-      _response.StatusCode = 401;
-      _response.Headers.InternalSet ("WWW-Authenticate", challenge, true);
-
-      _response.Close ();
-    }
-
     #endregion
 
     #region Internal Methods
-
-    internal bool Authenticate ()
-    {
-      var schm = _listener.SelectAuthenticationScheme (_request);
-
-      if (schm == AuthenticationSchemes.Anonymous)
-        return true;
-
-      if (schm == AuthenticationSchemes.None) {
-        _errorStatusCode = 403;
-        _errorMessage = "Authentication not allowed";
-        SendError ();
-
-        return false;
-      }
-
-      var realm = _listener.GetRealm ();
-      var user = HttpUtility.CreateUser (
-                   _request.Headers["Authorization"],
-                   schm,
-                   realm,
-                   _request.HttpMethod,
-                   _listener.GetUserCredentialsFinder ()
-                 );
-
-      if (user == null || !user.Identity.IsAuthenticated) {
-        var chal = new AuthenticationChallenge (schm, realm).ToString ();
-        sendAuthenticationChallenge (chal);
-
-        return false;
-      }
-
-      _user = user;
-
-      return true;
-    }
 
     internal HttpListenerWebSocketContext GetWebSocketContext (string protocol)
     {
@@ -247,9 +208,16 @@ namespace WebSocketSharp.Net
       return _websocketContext;
     }
 
-    internal bool Register ()
+    internal void SendAuthenticationChallenge (
+      AuthenticationSchemes scheme, string realm
+    )
     {
-      return _listener.RegisterContext (this);
+      var chal = new AuthenticationChallenge (scheme, realm).ToString ();
+
+      _response.StatusCode = 401;
+      _response.Headers.InternalSet ("WWW-Authenticate", chal, true);
+
+      _response.Close ();
     }
 
     internal void SendError ()
@@ -278,6 +246,9 @@ namespace WebSocketSharp.Net
 
     internal void Unregister ()
     {
+      if (_listener == null)
+        return;
+
       _listener.UnregisterContext (this);
     }
 
